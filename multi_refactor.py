@@ -37,6 +37,11 @@ def dBm2W(dBm):
     return watts
 
 
+def W2dBm(watts):
+    dBm = 10 * np.log10(watts) + 30
+    return dBm
+
+
 def dB2gain(dB):
     """
     This function takes power gain in decibels and converts to linear scale
@@ -591,4 +596,7 @@ def plot_MMSE():
     return
 
 
-plot_MMSE()
+# plot_MMSE()
+print(W2dBm(.0008))
+
+
