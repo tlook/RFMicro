@@ -25,6 +25,8 @@ with open('interpolator.pkl', 'rb') as f:
 
 
 """ conversion or shortcut functions """
+
+
 def dBm2W(dBm):
     """
     This function takes power in dBm and converts to Watts
@@ -95,27 +97,17 @@ def gen_ant_index_sq():
     """
     Generates an array for the antenna index of a M x M square array with
     elements [j, k, l] being the jth subarry, kth column, and lth row.
-    :return:
-    :rtype:
     """
     return np.array([(j+1, k+1, l+1) for j in range(N) for k in range(M) for l in range(M)])
 
 
 def gen_ant_index_1m():
-    """
-    Generates an index array for 1xM subarrays
-    :return:
-    :rtype:
-    """
+    """ Generates an index array for 1xM subarrays """
     return np.array([(j+1, k+1, 1)] for j in range(N) for k in range(M))
 
 
 def gen_ant_index_m1():
-    """
-    Generate an index array for Mx1 subarrays
-    :return:
-    :rtype:
-    """
+    """ Generate an index array for Mx1 subarrays """
     return np.array([(j+1, 1, l+1)] for j in range(N) for l in range(M))
 
 
@@ -126,24 +118,15 @@ def r_coef(theta, orientation):
     comp_epsilon, defined globally is the complex form of the dielectric const.
     orientation is 0 for perpendicular E field to plane of incidence or 1 for
     parallel
-    :param theta:
-    :type theta:
-    :param orientation:
-    :type orientation:
-    :return:
-    :rtype:
     """
     assert 0 <= theta <= (np.pi / 2)
-    # Fresnel coefficient for attenuation after reflection
     a = np.sin(theta)
     b = np.sqrt(comp_epsilon - (np.cos(theta) ** 2))
     if theta == 0:
         gamma = 1
-    elif orientation == 0 and theta != 0:
-        # for perpendicular coefficient off side walls
+    elif orientation == 0 and theta != 0:  # for perpendicular coefficient off side walls
         gamma = (a - b) / (a + b)
-    elif orientation == 1 and theta != 0:
-        # for parallel coefficient of ceiling
+    elif orientation == 1 and theta != 0:  # for parallel coefficient of ceiling
         gamma = (b - comp_epsilon * a) / (b + comp_epsilon * a)
     assert -1 <= gamma <= 1
     return gamma
@@ -154,10 +137,6 @@ def ula_pos(coord):
     Generate a ULA with optimal spacing subspace = np.sqrt(2.5 * wavelength / N)
     with 2.5 corresponding to an expected distance of R=2.5 meters for a Tx in
     the middle of a 5 x 5 x 3 room
-    :param coord:
-    :type coord:
-    :return:
-    :rtype:
     """
     assert len(coord) == 3
     # generate optimally spaced ULA with N elements
@@ -171,10 +150,6 @@ def ula_pos(coord):
 def subarray_ant_pos_sq(ula):
     """
     generate M x M subarrays centered at each ULA element
-    :param ula:
-    :type ula:
-    :return:
-    :rtype:
     """
     positions = []
     for j in range(N):
@@ -215,22 +190,14 @@ def gen_v_pos(rx_pos):
     vrx_pos = np.empty([8, 3])
     x0, y0, z0 = room_dim
     rx_x, rx_y, rx_z = rx_pos
-    # LOS
-    vrx_pos[0] = rx_pos
-    # Reflect off left wall
-    vrx_pos[1] = [-rx_x, rx_y, rx_z]
-    # Reflect off right wall
-    vrx_pos[2] = [-rx_x + 2 * x0, rx_y, rx_z]
-    # Reflect off ceiling
-    vrx_pos[3] = [rx_x, rx_y, -rx_z + 2 * z0]
-    # Reflect off left then right wall
-    vrx_pos[4] = [rx_x - 2 * x0, rx_y, rx_z]
-    # Reflect off right then left wall
-    vrx_pos[5] = [rx_x + 2 * x0, rx_y, rx_z]
-    # Reflect off left then ceiling
-    vrx_pos[6] = [- rx_x, rx_y, -rx_z + 2 * z0]
-    # Reflect off right wall then ceiling
-    vrx_pos[7] = [- rx_x + 2 * x0, rx_y, -rx_z + 2 * z0]
+    vrx_pos[0] = rx_pos  # LOS
+    vrx_pos[1] = [-rx_x, rx_y, rx_z]  # Reflect off left wall
+    vrx_pos[2] = [-rx_x + 2 * x0, rx_y, rx_z]  # Reflect off right wall
+    vrx_pos[3] = [rx_x, rx_y, -rx_z + 2 * z0]  # Reflect off ceiling
+    vrx_pos[4] = [rx_x - 2 * x0, rx_y, rx_z]  # Reflect off left then right wall
+    vrx_pos[5] = [rx_x + 2 * x0, rx_y, rx_z]  # Reflect off right then left wall
+    vrx_pos[6] = [- rx_x, rx_y, -rx_z + 2 * z0]  # Reflect off left then ceiling
+    vrx_pos[7] = [- rx_x + 2 * x0, rx_y, -rx_z + 2 * z0]  # Reflect off right wall then ceiling
     return vrx_pos
 
 
@@ -282,10 +249,6 @@ def find_steering_angles(tvec):
     """
     given a transmission vector, solve for theta (azimuthal) and phi (polar)
     steering angles
-    :param tvec:
-    :type tvec:
-    :return:
-    :rtype:
     """
     x, y, z = tvec
     r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
@@ -297,10 +260,6 @@ def find_steering_angles(tvec):
 def find_elev(tvec):
     """
     find the angle of elevation from the broadside
-    :param tvec:
-    :type tvec:
-    :return:
-    :rtype:
     """
     x, y, z = tvec
     beta = np.arctan2(z, np.sqrt(x ** 2 + y ** 2))
@@ -310,12 +269,6 @@ def find_elev(tvec):
 def rad_fade(beta, beta0):
     """
     calculate the reduction in amplitude due to radiation pattern
-    :param beta:
-    :type beta:
-    :param betaprime:
-    :type betaprime:
-    :return:
-    :rtype:
     """
     return np.cos(beta - beta0)
 
@@ -328,12 +281,6 @@ def h_matrix_element(mth_rx, nth_tx):
     Factors fade due to path loss, phase due to total distance of the ray, and
     Fresnel coefficients for reflections.
     See equations (27), (28), (29), (30)
-    :param mth_rx:
-    :type mth_rx:
-    :param nth_tx:
-    :type nth_tx:
-    :return:
-    :rtype:
     """
     path = get_path_params(mth_rx, nth_tx)
     alpha = (-2j * np.pi / wavelength)
@@ -353,14 +300,6 @@ def h_matrix_element(mth_rx, nth_tx):
 def hmn_w_radpat(mth_rx, nth_tx, beta0):
     """
     Same as h_matrix_element, but with antenna pattern considered
-    :param mth_rx:
-    :type mth_rx:
-    :param nth_tx:
-    :type nth_tx:
-    :param beta0:
-    :type beta0:
-    :return:
-    :rtype:
     """
     path = get_path_params(mth_rx, nth_tx)
     alpha = (-2j * np.pi / wavelength)
@@ -382,8 +321,6 @@ def generate_channel_matrix(subtype = 'square'):
     Generates a channel matrix based on global variables Rx and Tx which are the
     positions of receiver and transmitter array.
     See equation (27), returns are the three terms
-    :return:
-    :rtype:
     """
     ula_rx = ula_pos(Rx)
     ula_tx = ula_pos(Tx)
@@ -415,12 +352,6 @@ def chan_cap(singular_values, mu):
     water level and singular_values is the first N singular values of the
     channel matrix
     See equation (19)
-    :param singular_values:
-    :type singular_values:
-    :param mu:
-    :type mu:
-    :return:
-    :rtype:
     """
     s2 = (mu / Pn) * np.square(singular_values)
     sings = np.array([_ if _ > 1 else 1 for _ in s2])
@@ -432,10 +363,6 @@ def waterfilling(singular_values):
     water filling algorithm for determining water level and power allocation
     for water filling benchmark.  Input is the first N singular values of the
     channel matrix
-    :param singular_values:
-    :type singular_values:
-    :return:
-    :rtype:
     """
     rem_chan = 0
     s2 = Pn / np.square(singular_values)
@@ -458,16 +385,6 @@ def bs_weight(theta_j, phi_j, col, row):
     beamsteering weights for a square phased array given steering angels theta
     and phi, and the col and row of the element
     See equation (21)
-    :param theta_j:
-    :type theta_j:
-    :param phi_j:
-    :type phi_j:
-    :param col:
-    :type col:
-    :param row:
-    :type row:
-    :return:
-    :rtype:
     """
     ct = np.cos(theta_j)
     sp = np.sin(phi_j)
@@ -480,10 +397,6 @@ def gen_steering_matrix(angles):
     """
     take theta (azimuthal) and phi (polar) steering angles and generate
     steering matrix as given by equation (23)
-    :param angles:
-    :type angles:
-    :return:
-    :rtype:
     """
     phase = np.matrix(np.zeros([N * (M ** 2), N], dtype=complex))
     sub_ind = np.array([(k + 1, l + 1) for k in range(M) for l in range(M)])
@@ -492,10 +405,6 @@ def gen_steering_matrix(angles):
         for i in range(M ** 2):
             col, row = sub_ind[i]
             phase[i + (j * M ** 2), j] = bs_weight(theta_j, phi_j, col, row)
-    # phase = np.matrix(np.zeros([N * M ** 2, N], dtype=complex)) # testing code, unsteered beams
-    # for j in range(N):
-    #     for i in range(M ** 2):
-    #         phase[i + (j * M ** 2), j] = 1
     return phase / M
 
 
@@ -505,8 +414,6 @@ def gen_angle_list():
     along.  First, the receiver virtual array positions are made for LOS and
     first order reflections.  Steering angles are then calculated for each Tx
     array to each virtual receiver.
-    :return:
-    :rtype:
     """
     ula_tx = ula_pos(Tx)
     ula_rx = ula_pos(Rx)
@@ -522,10 +429,6 @@ def C_MMSE(F):
     """
     Create the MMSE equalizer from which to calculate the signal to interference
     and noise ratio from.  Given by equation () and here F is H^hat
-    :param F:
-    :type F:
-    :return:
-    :rtype:
     """
     a = (Pt/N) * (((Pt/N) * (F * F.H) + (Pn * np.identity(N * M ** 2))).I * F)
     return a
@@ -535,14 +438,6 @@ def SINR_k(C, F, k):
     """
     Calculate the signal to interference and noise ratio as given by equation
     ()
-    :param C:
-    :type C:
-    :param F:
-    :type F:
-    :param k:
-    :type k:
-    :return:
-    :rtype:
     """
     a = Pt/N
     b = a * abs2(C[:,k].H * F[:,k])
@@ -554,12 +449,6 @@ def spec_eff(C, F):
     """
     Use 16-QAM to calculate the sum rate spectral efficiency from the signal to
     interference and noise ratios given by
-    :param C:
-    :type C:
-    :param F:
-    :type F:
-    :return:
-    :rtype:
     """
     a = [SINR_k(C, F, k) if SINR_k(C, F, k) < 1000 else 1000 for k in range(N)]
     b = sum([qam_cap(_) for _ in a])
@@ -567,6 +456,9 @@ def spec_eff(C, F):
 
 
 def gen_cc_mesh(xpoints, ypoints):
+    """
+    Genereate mesh for contour and color plotting for waterfilling benchmark
+    """
     timer = mactime.Timer(xpoints * ypoints)
     xlist = np.linspace(0, room_dim[0], xpoints)
     ylist = np.linspace(0, room_dim[1], ypoints)
