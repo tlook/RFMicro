@@ -485,6 +485,9 @@ def gen_cc_mesh(xpoints, ypoints):
 
 
 def plot_contour_wf():
+    """
+    This function can be used to plot the Waterfilling benchmark figures
+    """
     X, Y, Z, Z2 = gen_cc_mesh(200, 200)
     levels = np.linspace(12.18, 34.74, 13)
     plt.figure(1)
@@ -507,10 +510,13 @@ def plot_contour_wf():
 
 
 def optimal_steering():
+    """
+    Return the best capacitiy and phased array steering directions
+    """
     angles = gen_angle_list()
     HL, H1, H2 = generate_channel_matrix()
     H = HL + H1 + H2
-    what = np.empty([(4 * N) ** 2, 3])
+    capacities = np.empty([(4 * N) ** 2, 3])
     k = 0
     for i in range(N * 4):
         for j in range(N * 4):
@@ -519,14 +525,15 @@ def optimal_steering():
             F = H * G
             C = C_MMSE(F)
             k1 = spec_eff(C, F)
-            what[k] = [k1, i % 4, j % 4]
+            capacities[k] = [k1, i % 4, j % 4]
             k += 1
-    print(what)
-    rofl = np.amax(what, axis=0)
-    return rofl
+    return np.amax(capacities, axis=0)
 
 
 def gen_se_mesh(xpoints, ypoints):
+    """
+    generate contour mesh for MMSE scheme
+    """
     timer = mactime.Timer(xpoints * ypoints)
     xlist = np.linspace(0, room_dim[0], xpoints)
     ylist = np.linspace(0, room_dim[1], ypoints)
@@ -572,6 +579,9 @@ def gen_se_mesh(xpoints, ypoints):
 
 
 def plot_MMSE():
+    """
+    plot
+    """
     X, Y, Z, Z2 = gen_se_mesh(200, 200)
     plt.figure(1)
     cp1 = plt.pcolor(X, Y, Z)
@@ -591,4 +601,7 @@ def plot_MMSE():
     return
 
 
-plot_MMSE()
+def optimize_radiation():
+    """
+    optimize antenna tilt
+    """
