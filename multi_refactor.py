@@ -37,6 +37,11 @@ def dBm2W(dBm):
     return watts
 
 
+def W2dBm(watts):
+    dBm = 10 * np.log10(watts) + 30
+    return dBm
+
+
 def dB2gain(dB):
     """
     This function takes power gain in decibels and converts to linear scale
