@@ -14,6 +14,7 @@ import numpy as np
 from scipy import constants as con
 import matplotlib.pyplot as plt
 import timer as mactime
+from itertools import product
 
 
 try:
@@ -73,7 +74,7 @@ def abs2(x):
 
 """ General Room & Antenna Globals """
 room_dim = [5.0, 5.0, 3.0]  # room dimension in meters
-Tx = [2.5, 2.5, 1.5]  # center of transmit array, modified in later functions
+Tx = [2.5, .5, 1.5]  # center of transmit array, modified in later functions
 Rx = [2.5, 0, 1.5]  # center of receive array, fixed in all calculations
 N = 2  # number of subarrays
 M = 4  # each subarray as MxM elements spaced wavelength/2 in a square or M x 1 line
@@ -317,11 +318,11 @@ def hmn_w_radpat(mth_rx, nth_tx, beta0):
             or1 = 1
         if i == 6 or i == 7:
             or2 = 1
-        hmn[i] = rad_fade(beta, beta0[i]) * nrm * r_coef(a1, or1) * r_coef(a2, or2) * np.exp(alpha * pmn) / pmn
+        hmn[i] = rad_fade(beta, beta0) * nrm * r_coef(a1, or1) * r_coef(a2, or2) * np.exp(alpha * pmn) / pmn
     return hmn[0], sum(hmn[1:4]), sum(hmn[4:8])
 
 
-def generate_channel_matrix(subtype = 'square'):
+def generate_channel_matrix(subtype = 'square', rad_pat = 'off'):
     """
     Generates a channel matrix based on global variables Rx and Tx which are the
     positions of receiver and transmitter array.
@@ -342,12 +343,57 @@ def generate_channel_matrix(subtype = 'square'):
         rx_array = subarray_ant_pos_sq(ula_rx)
         tx_array = subarray_ant_pos_sq(ula_tx)
         dim = N * M
+    elif subtype == 'ula':
+        rx_array = ula_rx
+        rx_array = ula_tx
+        dim = N
     hlos = np.empty([dim, dim], dtype=complex)
     h1 = np.empty([dim, dim], dtype=complex)
     h2 = np.empty([dim, dim], dtype=complex)
-    for i in range(dim):
-        for j in range(dim):
-            hlos[i, j], h1[i, j], h2[i, j] = h_matrix_element(i, j)
+    if rad_pat == 'off':
+        for i in range(dim):
+            for j in range(dim):
+                hlos[i, j], h1[i, j], h2[i, j] = h_matrix_element(i, j)
+    elif rad_pat == 'on':
+        for i in range(dim):
+            for j in range(dim):
+                hlos[i, j], h1[i, j], h2[i, j] = hmn_w_radpat(i, j, beta)
+    return hlos, h1, h2
+
+
+def gen_ch_rad_mat(betas):
+    """
+    Generates a channel matrix based on global variables Rx and Tx which are the
+    positions of receiver and transmitter array.
+    See equation (27), returns are the three terms
+    """
+    global rx_array, tx_array
+    rx_array = ula_pos(Rx)
+    tx_array = ula_pos(Tx)
+    hlos = np.empty([N, N], dtype=complex)
+    h1 = np.empty([N, N], dtype=complex)
+    h2 = np.empty([N, N], dtype=complex)
+    for i in range(N):
+        for j in range(N):
+            hlos[i, j], h1[i, j], h2[i, j] = hmn_w_radpat(i, j, betas[j])
+    return hlos, h1, h2
+
+
+def gen_ch_rad_mat_noopt():
+    """
+    Generates a channel matrix based on global variables Rx and Tx which are the
+    positions of receiver and transmitter array.
+    See equation (27), returns are the three terms
+    """
+    global rx_array, tx_array
+    rx_array = ula_pos(Rx)
+    tx_array = ula_pos(Tx)
+    hlos = np.empty([N, N], dtype=complex)
+    h1 = np.empty([N, N], dtype=complex)
+    h2 = np.empty([N, N], dtype=complex)
+    for i in range(N):
+        for j in range(N):
+            hlos[i, j], h1[i, j], h2[i, j] = hmn_w_radpat(i, j, 0)
     return hlos, h1, h2
 
 
@@ -606,7 +652,133 @@ def plot_MMSE():
     return
 
 
+def create_sweep_params(num_ant, blips):
+
+    angles = np.linspace(-np.pi/2, np.pi/2, blips)
+    betas = product(angles, repeat=num_ant)
+    return betas, blips ** num_ant
+
+
+
 def optimize_radiation():
     """
-    optimize antenna tilt
+    optimize antenna tilt for ULA
     """
+    betas, iterations = create_sweep_params(N, 50)
+    a = [0]
+    c = [0]
+    for i in betas:
+        hlos, h1, h2 = gen_ch_rad_mat(i)
+        H = hlos + h1 + h2
+        U, s, V = np.linalg.svd(H)
+        opt, mu = waterfilling(s)
+        cap = chan_cap(s, mu)
+        b = [cap, i]
+        if b[0] > a[0]:
+            a = b.copy()
+        H = h1 + h2
+        U, s, V = np.linalg.svd(H)
+        opt, mu = waterfilling(s)
+        cap2 = chan_cap(s, mu)
+        d = [cap2, i]
+        if d[0] > c[0]:
+            c = d.copy()
+    return a, c
+
+
+def gen_cc_rad_mesh(xpoints, ypoints):
+    """
+    Genereate mesh for contour and color plotting for waterfilling benchmark
+    """
+    timer = mactime.Timer(xpoints * ypoints)
+    xlist = np.linspace(0, room_dim[0], xpoints)
+    ylist = np.linspace(0, room_dim[1], ypoints)
+    X, Y = np.meshgrid(xlist, ylist)
+    Z = np.empty(X.shape)
+    Z2 = np.empty(X.shape)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            global Tx
+            Tx = [X[i, j], Y[i, j], 1.5]
+            a, c = optimize_radiation()
+            Z[i, j] = a[0]
+            Z2[i, j] = c[0]
+            timer.progress()
+    return X, Y, Z, Z2
+
+
+def gen_cc_rad_mesh_nochange(xpoints, ypoints):
+    """
+    Genereate mesh for contour and color plotting for waterfilling benchmark
+    """
+    timer = mactime.Timer(xpoints * ypoints)
+    xlist = np.linspace(0, room_dim[0], xpoints)
+    ylist = np.linspace(0, room_dim[1], ypoints)
+    X, Y = np.meshgrid(xlist, ylist)
+    Z = np.empty(X.shape)
+    Z2 = np.empty(X.shape)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            global Tx
+            Tx = [X[i, j], Y[i, j], 1.5]
+            hlos, h1, h2 = gen_ch_rad_mat_noopt()
+            H = hlos + h1 + h2
+            U, s, V = np.linalg.svd(H)
+            opt, mu = waterfilling(s)
+            Z[i, j] = chan_cap(s, mu)
+            H = h1 + h2
+            U, s, V = np.linalg.svd(H)
+            opt, mu = waterfilling(s)
+            Z2[i, j] = chan_cap(s, mu)
+            timer.progress()
+    return X, Y, Z, Z2
+
+
+def plot_contour_rad_wf():
+    """
+    This function can be used to plot the Waterfilling benchmark figures
+    """
+    X, Y, Z, Z2 = gen_cc_rad_mesh(200, 200)
+    plt.figure(1)
+    cp = plt.contour(X, Y, Z, linewidths=.5)
+    plt.clabel(cp, colors='k', fontsize=10)
+    cb = plt.colorbar(cp)
+    cb.set_label('Channel Capacity (bps/Hz)')
+    plt.title('Channel Capacity as a Function of Transmitter Position w/ radiation tuning')
+    plt.xlabel('x (meters)')
+    plt.ylabel('y (meters)')
+    plt.figure(2)
+    cp1 = plt.pcolor(X, Y, Z2)
+    cb1 = plt.colorbar(cp1)
+    cb1.set_label('Channel Capacity (bps/Hz)')
+    plt.title('No-LOS Channel Capacity as a Function of Transmitter Position w/ radiation tuning')
+    plt.xlabel('x (meters)')
+    plt.ylabel('y (meters)')
+    plt.show()
+    return
+
+
+def plot_cont_rad_wf_nochange():
+    """
+    This function can be used to plot the Waterfilling benchmark figures
+    """
+    X, Y, Z, Z2 = gen_cc_rad_mesh_nochange(200, 200)
+    plt.figure(1)
+    cp = plt.contour(X, Y, Z, linewidths=.5)
+    plt.clabel(cp, colors='k', fontsize=10)
+    cb = plt.colorbar(cp)
+    cb.set_label('Channel Capacity (bps/Hz)')
+    plt.title('Channel Capacity as a function of Tx position no ant opt')
+    plt.xlabel('x (meters)')
+    plt.ylabel('y (meters)')
+    plt.figure(2)
+    cp1 = plt.pcolor(X, Y, Z2)
+    cb1 = plt.colorbar(cp1)
+    cb1.set_label('Channel Capacity (bps/Hz)')
+    plt.title('No-LOS Channel Capacity as a function of Tx pos, no ant opt')
+    plt.xlabel('x (meters)')
+    plt.ylabel('y (meters)')
+    plt.show()
+    return
+
+plot_contour_rad_wf()
